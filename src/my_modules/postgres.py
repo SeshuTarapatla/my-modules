@@ -1,6 +1,9 @@
 __all__ = ["Postgres"]
 
+from sys import platform
 from dataclasses import dataclass
+from os import getenv
+from typing import cast
 
 from my_modules.k3s import K3S_Client
 
@@ -16,12 +19,17 @@ class PostgresSecret:
 
 class Postgres:
     def __init__(self) -> None:
-        self.env = PostgresSecret(**K3S_Client().get_secret("postgres-secret"))
+        self.env = cast(PostgresSecret, None)
+        self.sql_alchemy_base_url: str = getenv("SQLALCHEMY_CONN_URL") or ""
+        if platform == "win32":
+            self.env = PostgresSecret(**K3S_Client().get_secret("postgres-secret"))
 
-    def get_connection_string(self, db: str = "", host: str = ""):
+    def get_connection_string(self, db: str = "postgres", host: str = "localhost"):
         db = db if db else self.env.POSTGRES_DB
-        return self.get_base_connection_string() + f"/{db}"
+        return self.get_base_connection_string(host=host) + f"/{db}"
 
-    def get_base_connection_string(self, host: str = ""):
+    def get_base_connection_string(self, host: str = "localhost"):
+        if self.sql_alchemy_base_url:
+            return self.sql_alchemy_base_url + "/db"
         host = host if host else self.env.POSTGRES_HOST
         return f"postgresql+psycopg2://{self.env.POSTGRES_USER}@{self.env.POSTGRES_PASSWORD}@{host}:{self.env.POSTGRES_PORT}"
