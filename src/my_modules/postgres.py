@@ -28,13 +28,15 @@ class Postgres:
             self.env = PostgresSecret(**K3S_Client().get_secret("postgres-secret"))
 
     def get_connection_string(self, db: str | None = None, host: str | None = None):
+        if self.sql_alchemy_base_url:
+            return self.sql_alchemy_base_url + f"/{db}"
         db = db if db else self.env.POSTGRES_DB
         host = host if host else self.env.POSTGRES_HOST
         return self.get_base_connection_string(host=host) + f"/{db}"
 
     def get_base_connection_string(self, host: str = "localhost"):
         if self.sql_alchemy_base_url:
-            return self.sql_alchemy_base_url + "/db"
+            return self.sql_alchemy_base_url
         host = host if host else self.env.POSTGRES_HOST
         return f"postgresql+psycopg2://{self.env.POSTGRES_USER}:{self.env.POSTGRES_PASSWORD}@{host}:{self.env.POSTGRES_PORT}"
 
