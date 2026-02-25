@@ -34,23 +34,26 @@ def suppress_loggers(
 
 
 def get_logger(name: str) -> logging.Logger:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(message)s",
-        datefmt="[%Y-%m-%d %H:%M:%S]",
-        handlers=[
-            RichHandler(
-                console=console,
-                markup=True,
-                highlighter=None,
-                rich_tracebacks=True,
-                omit_repeated_times=False,
-                tracebacks_show_locals=True,
-            )
-        ],
-    )
+    logger = logging.getLogger(name)
 
-    return logging.getLogger(name)
+    if not logger.handlers:  # prevents duplicate handlers
+        logger.setLevel(logging.INFO)
+
+        handler = RichHandler(
+            console=console,
+            markup=True,
+            highlighter=None,
+            rich_tracebacks=True,
+            omit_repeated_times=False,
+            tracebacks_show_locals=True,
+        )
+        handler.setLevel(logging.INFO)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+
+        logger.addHandler(handler)
+        logger.propagate = False  # 🔥 critical
+
+    return logger
 
 
 if __name__ == "__main__":
