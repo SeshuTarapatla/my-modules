@@ -1,5 +1,0 @@
-from datetime import datetime
-
-
-def now() -> datetime:
-    return datetime.now().replace(microsecond=0)
