@@ -10,6 +10,8 @@ from sqlalchemy.exc import ProgrammingError
 
 from my_modules.k3s import K3S_Client
 
+POSTGRES_SVC: str = "postgres-service"
+
 
 @dataclass
 class PostgresSecret:
