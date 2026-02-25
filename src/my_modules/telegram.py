@@ -8,27 +8,34 @@ from telethon.sessions import StringSession
 
 from my_modules.helpers import handle_await
 
+class StrSession(StringSession):
+    def __str__(self) -> str:
+        return self.save()
 
 @dataclass
 class TelegramEnv:
-    api_id: int = int(getenv("TELEGRAM_API_ID", 0))
-    api_hash: str = getenv("TELEGRAM_API_HASH", "")
-    session: StringSession = StringSession(getenv("TELEGRAM_SESSION", ""))
-    phone_number: str = getenv("TELEGRAM_NUMBER", "")
+    TELEGRAM_API_ID: int = int(getenv("TELEGRAM_API_ID", 0))
+    TELEGRAM_API_HASH: str = getenv("TELEGRAM_API_HASH", "")
+    TELEGRAM_SESSION: StrSession = StrSession(getenv("TELEGRAM_SESSION", ""))
+    TELEGRAM_NUMBER: str = getenv("TELEGRAM_NUMBER", "")
 
     def __post_init__(self):
-        if not any((self.api_id, self.api_hash, self.session, self.phone_number)):
+        if not any((self.TELEGRAM_API_ID, self.TELEGRAM_API_HASH, self.TELEGRAM_SESSION, self.TELEGRAM_NUMBER)):
             raise EnvironmentError(
                 "Telegram session variables are not found in the environment."
             )
+    
+    def items(self):
+        for key, value in self.__dict__.items():
+            yield key, value
 
 
 class Telegram(TelegramClient):
     def __init__(self):
         t_env = TelegramEnv()
-        self.phone_number = t_env.phone_number
-        self.session: StringSession = t_env.session
-        super().__init__(t_env.session, t_env.api_id, t_env.api_hash)
+        self.phone_number = t_env.TELEGRAM_NUMBER
+        self.session: StringSession = t_env.TELEGRAM_SESSION
+        super().__init__(t_env.TELEGRAM_SESSION, t_env.TELEGRAM_API_ID, t_env.TELEGRAM_API_HASH)
     
     async def start(self): # type: ignore[override]
         _start = super().start(self.phone_number)
