@@ -2,11 +2,12 @@ __all__ = ["Telegram"]
 
 from dataclasses import dataclass
 from os import getenv
-from typing import cast
+from typing import AsyncGenerator, Literal, cast, overload
 
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.tl.functions.channels import CreateChannelRequest
+from telethon.tl.patched import Message
 from telethon.types import Channel, Updates
 
 from my_modules.helpers import handle_await
@@ -42,6 +43,23 @@ class TelegramEnv:
             yield key, value
 
 
+class ChannelNotFound(Exception): ...
+
+
+class TelegramChannel(Channel):
+    def __init__(self, client: "Telegram", *args, **kwargs):
+        self.client = client
+        super().__init__(*args, **kwargs)
+
+    async def iter_messages(self) -> AsyncGenerator[Message, None]:
+        async for message in self.client.iter_messages(self, reverse=True, offset_id=1):
+            yield message
+
+    async def count(self) -> int:
+        messages = await self.client.get_messages(self, limit=0)
+        return messages.__getattribute__("total") - 1
+
+
 class Telegram(TelegramClient):
     def __init__(self):
         t_env = TelegramEnv()
@@ -61,19 +79,33 @@ class Telegram(TelegramClient):
         except Exception:
             return False
 
-    async def get_channel(self, title: str) -> Channel | None:
+    @overload
+    async def get_channel(
+        self, title: str, strict: Literal[False]
+    ) -> TelegramChannel | None: ...
+
+    @overload
+    async def get_channel(
+        self, title: str, strict: Literal[True]
+    ) -> TelegramChannel: ...
+
+    async def get_channel(
+        self, title: str, strict: bool = False
+    ) -> TelegramChannel | None:
         for archived in (False, True):
             async for dialog in self.iter_dialogs(archived=archived):
                 if isinstance(dialog.entity, Channel) and dialog.title == title:
-                    return dialog.entity
+                    return TelegramChannel(self, **dialog.entity.__dict__)
+        if strict:
+            raise ChannelNotFound(f"No channel found with title='{title}'")
 
     async def create_channel(
         self, title: str, *, about: str = "", broadcast: bool = True
-    ) -> Channel:
+    ) -> TelegramChannel:
         request = CreateChannelRequest(title=title, about=about)
         if broadcast:
             request.broadcast = True
         else:
             request.megagroup = True
         result = cast(Updates, await self(request))
-        return cast(Channel, result.chats[0])
+        return TelegramChannel(self, **result.chats[0].__dict__)
