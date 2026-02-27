@@ -1,6 +1,9 @@
 __all__ = ["K3S_Client"]
 
 from base64 import b64decode
+from os import getenv
+from subprocess import check_output
+from sys import platform
 
 from kubernetes import client, config
 from kubernetes.client.models.v1_secret import V1Secret
@@ -21,3 +24,13 @@ class K3S_Client:
             )
         except Exception as e:
             return {"error": str(e)}
+
+
+def get_wsl_host_ip() -> str:
+    if platform == "win32":
+        response = check_output(["wsl", "ip", "route", "show", "default"], text=True)
+        return response.split()[2]
+    else:
+        if win_host := getenv("WINDOWS_HOST"):
+            return win_host
+        raise ValueError("Windows Host IP not found in the environment.")
