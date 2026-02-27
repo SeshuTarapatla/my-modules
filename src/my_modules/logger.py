@@ -51,7 +51,7 @@ def get_logger(name: str) -> logging.Logger:
         handler.setFormatter(logging.Formatter("%(message)s"))
 
         logger.addHandler(handler)
-        logger.propagate = False  # 🔥 critical
+        logger.propagate = True
 
     return logger
 
