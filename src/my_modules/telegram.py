@@ -81,7 +81,7 @@ class Telegram(TelegramClient):
 
     @overload
     async def get_channel(
-        self, title: str, strict: Literal[False]
+        self, title: str, strict: Literal[False] = False
     ) -> TelegramChannel | None: ...
 
     @overload
