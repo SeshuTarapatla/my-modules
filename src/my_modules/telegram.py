@@ -59,6 +59,12 @@ class TelegramChannel(Channel):
         messages = await self.client.get_messages(self, limit=0)
         return messages.__getattribute__("total") - 1
 
+    def __str__(self) -> str:
+        return f"TelegramChannel(title='{self.title}', id={self.id})"
+
+    def __repr__(self) -> str:
+        return str(self)
+
 
 class Telegram(TelegramClient):
     def __init__(self):
