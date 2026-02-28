@@ -1,5 +1,6 @@
 __all__ = ["Telegram"]
 
+from asyncio import wait_for
 from dataclasses import dataclass
 from os import getenv
 from typing import AsyncGenerator, Literal, cast, overload
@@ -90,8 +91,9 @@ class Telegram(TelegramClient):
 
     async def test_connection(self) -> bool:
         try:
-            return bool(await self.start())
-        except Exception:
+            await wait_for(self.start(), timeout=5)
+            return True
+        except TimeoutError:
             return False
 
     @overload
