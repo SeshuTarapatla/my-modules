@@ -46,13 +46,22 @@ class TelegramEnv:
 class ChannelNotFound(Exception): ...
 
 
+class TelegramMessage(Message):
+    def __str__(self):
+        return f"TelegramMessage(text='{self.text}', channel='{self.chat.title if isinstance(self.chat, Channel) else 'unknown'}', id={self.id})"
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
 class TelegramChannel(Channel):
     def __init__(self, client: "Telegram", *args, **kwargs):
         self.client = client
         super().__init__(*args, **kwargs)
 
-    async def iter_messages(self) -> AsyncGenerator[Message, None]:
+    async def iter_messages(self) -> AsyncGenerator[TelegramMessage, None]:
         async for message in self.client.iter_messages(self, reverse=True, offset_id=1):
+            message.__class__ = TelegramMessage
             yield message
 
     async def count(self) -> int:
