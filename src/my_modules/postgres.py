@@ -12,6 +12,7 @@ from my_modules.k3s import K3S_Client
 
 POSTGRES_SVC: str = "postgres-service"
 
+class PostgresSecretNotFound(Exception): ...
 
 @dataclass
 class PostgresSecret:
@@ -27,7 +28,10 @@ class Postgres:
         self.env = cast(PostgresSecret, None)
         self.sql_alchemy_base_url: str = getenv("SQLALCHEMY_CONN_URL") or ""
         if platform == "win32":
-            self.env = PostgresSecret(**K3S_Client().get_secret("postgres-secret"))
+            data = K3S_Client().get_secret("postgres-secret")
+            if "error" in data:
+                raise PostgresSecretNotFound("Postgres secret not found. Make sure postgres helmchart is deployed.")
+            self.env = PostgresSecret(**data)
 
     def get_connection_string(self, db: str | None = None, host: str | None = None):
         if self.sql_alchemy_base_url:
