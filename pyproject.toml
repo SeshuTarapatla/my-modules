@@ -1,0 +1,16 @@
+[project]
+name = "my-modules"
+version = "0.1.0"
+description = "My custom Python modules and scripts for reusability."
+readme = "README.md"
+authors = [
+    { name = "SeshuTarapatla", email = "seshu.tarapatla@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "rich>=14.3.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.8,<0.11.0"]
+build-backend = "uv_build"
