@@ -65,7 +65,7 @@ class UserEnv:
         Raises:
             CalledProcessError: If the setx command fails to execute.
         """
-        run(["setx", key, value], check=True)
+        run(["setx", key, value], check=True, capture_output=True)
 
     @classmethod
     def setx(cls, key: str, value: str):
