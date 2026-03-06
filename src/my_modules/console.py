@@ -1,5 +1,7 @@
 __all__ = ["console"]
 
+from typing import overload
+
 from rich.console import Console
 
 
@@ -16,8 +18,16 @@ class CustomConsole(Console):
     def error(self, message: str):
         self.print(f"[bold red]ERROR[/]   : {message}")
 
-    def input_(self, message: str) -> str:
-        self.print(f"[bold magenta]PROMPT[/]  : {message}")
+    @overload
+    def input_(self, message: str) -> str: ...
+
+    @overload
+    def input_(
+        self, message: str, tag: str = "PROMPT", color: str = "magenta"
+    ) -> str: ...
+
+    def input_(self, message: str, tag: str = "PROMPT", color: str = "magenta") -> str:
+        self.print(f"[bold {color}]{tag.ljust(7)}[/] : {message}")
         return self.input("[bold cyan]INPUT[/]   : ")
 
 
