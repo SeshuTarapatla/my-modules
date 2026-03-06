@@ -19,14 +19,14 @@ class CustomConsole(Console):
         self.print(f"[bold red]ERROR[/]   : {message}")
 
     @overload
-    def input_(self, message: str) -> str: ...
+    def log_input(self, message: str) -> str: ...
 
     @overload
-    def input_(
+    def log_input(
         self, message: str, tag: str = "PROMPT", color: str = "magenta"
     ) -> str: ...
 
-    def input_(self, message: str, tag: str = "PROMPT", color: str = "magenta") -> str:
+    def log_input(self, message: str, tag: str = "PROMPT", color: str = "magenta") -> str:
         self.print(f"[bold {color}]{tag.ljust(7)}[/] : {message}")
         return self.input("[bold cyan]INPUT[/]   : ")
 
