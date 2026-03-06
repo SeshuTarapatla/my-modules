@@ -15,8 +15,10 @@ class CustomConsole(Console):
     def warning(self, message: str):
         self.print(f"[bold yellow]WARNING[/] : {message}")
 
-    def error(self, message: str):
+    def error(self, message: str, kill: int | None = None):
         self.print(f"[bold red]ERROR[/]   : {message}")
+        if isinstance(kill, int):
+            exit(kill)
 
     @overload
     def log_input(self, message: str) -> str: ...
@@ -26,7 +28,9 @@ class CustomConsole(Console):
         self, message: str, tag: str = "PROMPT", color: str = "magenta"
     ) -> str: ...
 
-    def log_input(self, message: str, tag: str = "PROMPT", color: str = "magenta") -> str:
+    def log_input(
+        self, message: str, tag: str = "PROMPT", color: str = "magenta"
+    ) -> str:
         self.print(f"[bold {color}]{tag.ljust(7)}[/] : {message}")
         return self.input("[bold cyan]INPUT[/]   : ")
 
