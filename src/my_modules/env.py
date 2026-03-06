@@ -1,3 +1,5 @@
+__all__ = ["UserEnv"]
+
 from functools import wraps
 from shutil import which
 from subprocess import CalledProcessError, run
