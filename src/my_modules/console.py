@@ -1,6 +1,7 @@
 __all__ = ["console"]
 
 from typing import overload
+from sys import exit
 
 from rich.console import Console
 
