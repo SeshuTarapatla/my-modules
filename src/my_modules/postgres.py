@@ -2,10 +2,9 @@ from sys import platform
 from typing import Literal
 
 from pydantic import BaseModel
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, text
 
 from my_modules.kubernetes import Kubernetes
-
 
 
 class PostgresSecret(BaseModel):
@@ -98,3 +97,27 @@ class Postgres:
         return create_engine(
             url=PostgresSecret.get_connection_string(database=self.database)
         )
+
+    @property
+    def db_exists(self) -> bool:
+        """Check if the specified database exists in PostgreSQL.
+
+        Executes a query against the pg_database system catalog to verify
+        if the database specified during initialization exists.
+
+        Returns:
+            bool: True if the database exists, False otherwise
+
+        Note:
+            Uses the development engine connection (engine_dev) with AUTOCOMMIT isolation
+
+        Example:
+            >>> postgres = Postgres("my_database")
+            >>> postgres.db_exists
+            True
+        """
+        with self.engine_dev.connect() as conn:
+            result = conn.execute(
+                text(f"SELECT 1 FROM pg_database WHERE datname = '{self.database}';")
+            )
+            return bool(result.one_or_none())
