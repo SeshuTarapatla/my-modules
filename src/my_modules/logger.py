@@ -9,6 +9,7 @@ from my_modules.console import console
 
 LogLevel: TypeAlias = int | str
 
+
 def get_logger(
     name: str = __name__, level: LogLevel = logging.INFO, propagate: bool = False
 ) -> logging.Logger:
@@ -27,18 +28,18 @@ def get_logger(
     """
 
     logger = logging.getLogger(name)
-    if not logger.handlers:
-        handler = RichHandler(
-            console=console,
-            markup=True,
-            highlighter=None,
-            rich_tracebacks=True,
-            omit_repeated_times=False,
-            tracebacks_show_locals=True,
-        )
-        handler.setLevel(logging.INFO)
-        handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.setLevel(level)
+    handler = RichHandler(
+        console=console,
+        markup=True,
+        highlighter=None,
+        rich_tracebacks=True,
+        omit_repeated_times=False,
+        tracebacks_show_locals=True,
+    )
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter("%(message)s"))
 
-        logger.addHandler(handler)
-        logger.propagate = propagate
+    logger.handlers = [handler]
+    logger.propagate = propagate
     return logger
