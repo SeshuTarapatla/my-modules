@@ -1,3 +1,4 @@
+from os import getenv
 from sys import platform
 from typing import Literal
 
@@ -28,8 +29,9 @@ class PostgresSecret(BaseModel):
     ) -> str:
         """Generate a PostgreSQL connection string.
 
-        Constructs a SQLAlchemy-compatible connection string using credentials
-        from Kubernetes secrets.
+        Constructs a SQLAlchemy-compatible connection string using either:
+        1. SQLALCHEMY_CONN_URL environment variable (if set)
+        2. Credentials from Kubernetes secrets (as fallback)
 
         Args:
             database: Name of the database to connect to (default: "postgres")
@@ -41,10 +43,14 @@ class PostgresSecret(BaseModel):
         Returns:
             str: SQLAlchemy connection string in format:
                  "postgresql+engine://user:password@host:port/database"
+                 or the value of SQLALCHEMY_CONN_URL environment variable if set
 
         Raises:
             Exception: If Kubernetes secret retrieval fails or credentials are invalid
+                      (only when SQLALCHEMY_CONN_URL is not set)
         """
+        if sqlalchemy_conn_url := getenv("SQLALCHEMY_CONN_URL"):
+            return sqlalchemy_conn_url
         k3s_secret = Kubernetes().get_secret("postgres-secret")
         secret = cls(**k3s_secret)
         return f"postgresql+{engine}://{secret.POSTGRES_USER}:{secret.POSTGRES_PASSWORD}@{'localhost' if local else secret.POSTGRES_HOST}:{secret.POSTGRES_PORT}/{database}"
