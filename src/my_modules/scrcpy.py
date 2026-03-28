@@ -89,7 +89,6 @@ class Scrcpy:
             SystemExit: If no devices are connected or if the specified device is not found.
         """
         devices = adb.device_list()
-        log.error("No adb devices are connected for scrcpy session.")
         if self.serial:
             for device in devices:
                 if device.serial == self.serial:
