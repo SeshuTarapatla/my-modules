@@ -11,7 +11,9 @@ LogLevel: TypeAlias = int | str
 
 
 def get_logger(
-    name: str = __name__, level: LogLevel = logging.INFO, propagate: bool = False
+    name: str = (name := lambda: __name__)(),
+    level: LogLevel = logging.INFO,
+    propagate: bool = False,
 ) -> logging.Logger:
     """
     Configure and return a logger with enhanced formatting using Rich library.
