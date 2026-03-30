@@ -127,3 +127,94 @@ class Postgres:
                 text(f"SELECT 1 FROM pg_database WHERE datname = '{self.database}';")
             )
             return bool(result.one_or_none())
+    
+    def create_db(self) -> bool:
+        """Create the database if it doesn't exist.
+
+        Uses the development engine connection to execute a CREATE DATABASE
+        statement if the database doesn't already exist.
+
+        Returns:
+            bool: True if the database was created or already exists
+
+        Raises:
+            sqlalchemy.exc.SQLAlchemyError: If database creation fails due to connection issues,
+                                          permission problems, or other database errors
+            sqlalchemy.exc.OperationalError: If there are connection or operational issues
+            sqlalchemy.exc.ProgrammingError: If there are SQL syntax or permission errors
+
+        Example:
+            >>> postgres = Postgres("my_database")
+            >>> postgres.create_db()
+            True
+        """
+        if self.db_exists:
+            return True
+
+        with self.engine_dev.connect() as conn:
+            conn.execute(text(f"CREATE DATABASE {self.database};"))
+            conn.commit()
+        return True
+
+    def list_db(self) -> list[str]:
+        """List all databases in the PostgreSQL instance.
+
+        Retrieves a list of all database names from the pg_database system catalog.
+
+        Returns:
+            list[str]: List of database names
+
+        Raises:
+            sqlalchemy.exc.SQLAlchemyError: If database listing fails due to connection issues,
+                                          permission problems, or query execution errors
+            sqlalchemy.exc.OperationalError: If there are connection or operational issues
+            sqlalchemy.exc.ProgrammingError: If there are SQL syntax or permission errors
+
+        Example:
+            >>> postgres = Postgres()
+            >>> postgres.list_db()
+            ['postgres', 'template0', 'template1', 'my_database']
+        """
+        with self.engine_dev.connect() as conn:
+            result = conn.execute(text("SELECT datname FROM pg_database WHERE datname NOT LIKE 'template%' ORDER BY datname;"))
+            return [row[0] for row in result.fetchall()]
+
+    def drop_db(self, force: bool = False) -> bool:
+        """Drop the specified database if it exists.
+
+        Uses the development engine connection to execute a DROP DATABASE
+        statement. When force=True, uses FORCE option to terminate all active connections.
+
+        Args:
+            force: Whether to forcefully terminate all active connections (default: False)
+
+        Returns:
+            bool: True if the database was dropped or didn't exist
+
+        Raises:
+            sqlalchemy.exc.SQLAlchemyError: If database dropping fails due to connection issues,
+                                          permission problems, active connections (when force=False),
+                                          or other database errors
+            sqlalchemy.exc.OperationalError: If there are connection or operational issues
+            sqlalchemy.exc.ProgrammingError: If there are SQL syntax or permission errors
+            sqlalchemy.exc.DatabaseError: If the database is in use and force=False
+
+        Example:
+            >>> postgres = Postgres("my_database")
+            >>> postgres.drop_db()  # Gentle drop
+            True
+            >>> postgres.drop_db(force=True)  # Forceful drop
+            True
+        """
+        if not self.db_exists:
+            return True
+
+        with self.engine_dev.connect() as conn:
+            if force:
+                # Use DROP DATABASE WITH (FORCE) to automatically terminate connections
+                conn.execute(text(f"DROP DATABASE IF EXISTS {self.database} WITH (FORCE);"))
+            else:
+                # Gentle drop - may fail if there are active connections
+                conn.execute(text(f"DROP DATABASE IF EXISTS {self.database};"))
+            conn.commit()
+        return True
