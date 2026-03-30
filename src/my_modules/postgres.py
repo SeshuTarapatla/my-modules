@@ -128,11 +128,14 @@ class Postgres:
             )
             return bool(result.one_or_none())
     
-    def create_db(self) -> bool:
+    def create_db(self, database: str | None = None) -> bool:
         """Create the database if it doesn't exist.
 
         Uses the development engine connection to execute a CREATE DATABASE
         statement if the database doesn't already exist.
+
+        Args:
+            database: Name of the database to create (default: None, uses self.database)
 
         Returns:
             bool: True if the database was created or already exists
@@ -145,14 +148,20 @@ class Postgres:
 
         Example:
             >>> postgres = Postgres("my_database")
-            >>> postgres.create_db()
+            >>> postgres.create_db()  # Creates self.database
+            True
+            >>> postgres.create_db("another_db")  # Creates specified database
             True
         """
-        if self.db_exists:
-            return True
+        target_db = database or self.database
 
+        # Check if database exists using the target database name
         with self.engine_dev.connect() as conn:
-            conn.execute(text(f"CREATE DATABASE {self.database};"))
+            result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{target_db}';"))
+            if result.one_or_none():
+                return True
+
+            conn.execute(text(f"CREATE DATABASE {target_db};"))
             conn.commit()
         return True
 
@@ -179,19 +188,21 @@ class Postgres:
             result = conn.execute(text("SELECT datname FROM pg_database WHERE datname NOT LIKE 'template%' ORDER BY datname;"))
             return [row[0] for row in result.fetchall()]
 
-    def drop_db(self, force: bool = False) -> bool:
+    def drop_db(self, database: str | None = None, force: bool = False) -> bool:
         """Drop the specified database if it exists.
 
         Uses the development engine connection to execute a DROP DATABASE
         statement. When force=True, uses FORCE option to terminate all active connections.
 
         Args:
+            database: Name of the database to drop (default: None, uses self.database)
             force: Whether to forcefully terminate all active connections (default: False)
 
         Returns:
             bool: True if the database was dropped or didn't exist
 
         Raises:
+            ValueError: If attempting to drop the "postgres" database
             sqlalchemy.exc.SQLAlchemyError: If database dropping fails due to connection issues,
                                           permission problems, active connections (when force=False),
                                           or other database errors
@@ -201,20 +212,30 @@ class Postgres:
 
         Example:
             >>> postgres = Postgres("my_database")
-            >>> postgres.drop_db()  # Gentle drop
+            >>> postgres.drop_db()  # Drops self.database
+            True
+            >>> postgres.drop_db("another_db")  # Drops specified database
             True
             >>> postgres.drop_db(force=True)  # Forceful drop
             True
         """
-        if not self.db_exists:
-            return True
+        target_db = database or self.database
 
+        # Prevent dropping the default postgres database
+        if target_db == "postgres":
+            raise ValueError("Cannot drop the 'postgres'. Read-only database.")
+
+        # Check if database exists using the target database name
         with self.engine_dev.connect() as conn:
+            result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{target_db}';"))
+            if not result.one_or_none():
+                return True
+
             if force:
                 # Use DROP DATABASE WITH (FORCE) to automatically terminate connections
-                conn.execute(text(f"DROP DATABASE IF EXISTS {self.database} WITH (FORCE);"))
+                conn.execute(text(f"DROP DATABASE IF EXISTS {target_db} WITH (FORCE);"))
             else:
                 # Gentle drop - may fail if there are active connections
-                conn.execute(text(f"DROP DATABASE IF EXISTS {self.database};"))
+                conn.execute(text(f"DROP DATABASE IF EXISTS {target_db};"))
             conn.commit()
         return True
