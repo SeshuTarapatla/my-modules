@@ -3,11 +3,11 @@
 This module provides utility functions for handling async operations.
 """
 
-__all__: list[str] = ["handle_await"]
+__all__: list[str] = ["handle_await", "achain", "snap_window"]
 
 import ctypes
 from inspect import isawaitable
-from typing import Any, Awaitable, TypeVar, overload
+from typing import Any, AsyncIterable, AsyncIterator, Awaitable, TypeVar, overload
 
 T = TypeVar("T")
 
@@ -50,6 +50,44 @@ async def handle_await(object: Any) -> Any:
     """
     return await object if isawaitable(object) else object
 
+
+@overload
+def achain(*async_iterables: AsyncIterable[T]) -> AsyncIterator[T]: ...
+
+
+@overload
+def achain(*async_iterables: AsyncIterable[Any]) -> AsyncIterator[Any]: ...
+
+
+async def achain(*async_iterables: AsyncIterable[Any]) -> AsyncIterator[Any]:
+    """Chain multiple async iterables into a single async iterator.
+
+    Yields items from each async iterable in sequence, moving to the next
+    iterable only after the current one is exhausted.
+
+    Args:
+        *async_iterables: Zero or more async iterables to chain together.
+
+    Yields:
+        Items from each async iterable in the order they were provided.
+
+    Examples:
+        >>> import asyncio
+        >>> async def async_range(start: int, stop: int):
+        ...     for i in range(start, stop):
+        ...         yield i
+        ...
+        >>> async def main():
+        ...     async for item in achain(async_range(0, 3), async_range(3, 6)):
+        ...         print(item)  # Output: 0, 1, 2, 3, 4, 5
+        ...
+        >>> asyncio.run(main())
+    """
+    for iterable in async_iterables:
+        async for item in iterable:
+            yield item
+
+
 def snap_window(title: str, x: int, y: int, w: int, h: int):
     """Snap a window to specific coordinates and dimensions.
 
@@ -77,4 +115,3 @@ def snap_window(title: str, x: int, y: int, w: int, h: int):
     if (hwnd := user32.FindWindowW(None, title)) is None:
         raise Exception(f"No window found with title `{title}`.")
     user32.MoveWindow(hwnd, x, y, w, h, True)
-    
