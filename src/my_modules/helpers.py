@@ -3,9 +3,8 @@
 This module provides utility functions for handling async operations.
 """
 
-__all__: list[str] = ["handle_await", "achain", "snap_window"]
+__all__: list[str] = ["handle_await", "achain", ]
 
-import ctypes
 from inspect import isawaitable
 from typing import Any, AsyncIterable, AsyncIterator, Awaitable, TypeVar, overload
 
@@ -88,30 +87,3 @@ async def achain(*async_iterables: AsyncIterable[Any]) -> AsyncIterator[Any]:
             yield item
 
 
-def snap_window(title: str, x: int, y: int, w: int, h: int):
-    """Snap a window to specific coordinates and dimensions.
-
-    This function finds a window by its title and moves/resizes it to the specified
-    position and dimensions using Windows API calls.
-
-    Args:
-        title: The title of the window to find and snap.
-        x: The new x-coordinate for the window's top-left corner.
-        y: The new y-coordinate for the window's top-left corner.
-        w: The new width of the window.
-        h: The new height of the window.
-
-    Returns:
-        None
-
-    Raises:
-        Exception: If no window is found with the specified title.
-
-    Examples:
-        >>> snap_window("Notepad", 100, 100, 800, 600)
-        # Moves the Notepad window to position (100, 100) with size 800x600
-    """
-    user32 = ctypes.windll.user32
-    if (hwnd := user32.FindWindowW(None, title)) is None:
-        raise Exception(f"No window found with title `{title}`.")
-    user32.MoveWindow(hwnd, x, y, w, h, True)
