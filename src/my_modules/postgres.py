@@ -313,7 +313,7 @@ class Postgres:
                     manifest_path.write_text("\n".join(tables), encoding="utf-8")
                     tar.add(manifest_path, arcname=manifest_path.name)
 
-        log.info(f"Backup exported to [cyan]{archive.absolute()}[/]")
+        log.info(f"Backup exported to [blue]{archive.absolute()}[/]")
         return archive
 
     def restore_db(self, archive: Path) -> bool:
