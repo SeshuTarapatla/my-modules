@@ -3,9 +3,13 @@ from sys import platform
 from typing import Literal
 
 from pydantic import BaseModel
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, create_engine, inspect, text
+from sqlalchemy.exc import OperationalError
 
 from my_modules.kubernetes import Kubernetes
+from my_modules.logger import get_logger
+
+log = get_logger(__name__)
 
 
 class PostgresSecret(BaseModel):
@@ -44,10 +48,6 @@ class PostgresSecret(BaseModel):
             str: SQLAlchemy connection string in format:
                  "postgresql+engine://user:password@host:port/database"
                  or the value of SQLALCHEMY_CONN_URL environment variable if set
-
-        Raises:
-            Exception: If Kubernetes secret retrieval fails or credentials are invalid
-                      (only when SQLALCHEMY_CONN_URL is not set)
         """
         if sqlalchemy_conn_url := getenv("SQLALCHEMY_CONN_URL"):
             return sqlalchemy_conn_url
@@ -70,6 +70,8 @@ class Postgres:
             database: Name of the database to connect to (default: "postgres")
         """
         self.database = database
+        self._engine = None
+        self._engine_dev = None
 
     @property
     def engine_dev(self) -> Engine:
@@ -84,9 +86,10 @@ class Postgres:
         Note:
             Uses default database name "postgres" and AUTOCOMMIT isolation level
         """
-        return create_engine(
+        self._engine_dev = self._engine_dev or create_engine(
             url=PostgresSecret.get_connection_string(), isolation_level="AUTOCOMMIT"
         )
+        return self._engine_dev
 
     @property
     def engine(self) -> Engine:
@@ -100,12 +103,13 @@ class Postgres:
         Note:
             Uses the database name provided in the constructor
         """
-        return create_engine(
+        self._engine = self._engine or create_engine(
             url=PostgresSecret.get_connection_string(database=self.database)
         )
+        return self._engine
 
     @property
-    def db_exists(self) -> bool:
+    def exists(self) -> bool:
         """Check if the specified database exists in PostgreSQL.
 
         Executes a query against the pg_database system catalog to verify
@@ -116,52 +120,66 @@ class Postgres:
 
         Note:
             Uses the development engine connection (engine_dev) with AUTOCOMMIT isolation
-
-        Example:
-            >>> postgres = Postgres("my_database")
-            >>> postgres.db_exists
-            True
         """
         with self.engine_dev.connect() as conn:
             result = conn.execute(
                 text(f"SELECT 1 FROM pg_database WHERE datname = '{self.database}';")
             )
             return bool(result.one_or_none())
-    
-    def create_db(self, database: str | None = None) -> bool:
+
+    def create_db(self) -> bool:
         """Create the database if it doesn't exist.
 
         Uses the development engine connection to execute a CREATE DATABASE
         statement if the database doesn't already exist.
 
-        Args:
-            database: Name of the database to create (default: None, uses self.database)
-
         Returns:
             bool: True if the database was created or already exists
-
-        Raises:
-            sqlalchemy.exc.SQLAlchemyError: If database creation fails due to connection issues,
-                                          permission problems, or other database errors
-            sqlalchemy.exc.OperationalError: If there are connection or operational issues
-            sqlalchemy.exc.ProgrammingError: If there are SQL syntax or permission errors
-
-        Example:
-            >>> postgres = Postgres("my_database")
-            >>> postgres.create_db()  # Creates self.database
-            True
-            >>> postgres.create_db("another_db")  # Creates specified database
-            True
         """
-        target_db = database or self.database
-
         # Check if database exists using the target database name
         with self.engine_dev.connect() as conn:
-            result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{target_db}';"))
+            result = conn.execute(
+                text(f"SELECT 1 FROM pg_database WHERE datname = '{self.database}';")
+            )
             if result.one_or_none():
                 return True
 
-            conn.execute(text(f"CREATE DATABASE {target_db};"))
+            conn.execute(text(f"CREATE DATABASE {self.database};"))
+            conn.commit()
+        return True
+
+    def drop_db(self, force: bool = False) -> bool:
+        """Drop the specified database if it exists.
+
+        Uses the development engine connection to execute a DROP DATABASE
+        statement. When force=True, uses FORCE option to terminate all active connections.
+
+        Args:
+            force: Whether to forcefully terminate all active connections (default: False)
+
+        Returns:
+            bool: True if the database was dropped or didn't exist
+        """
+        # Prevent dropping the default postgres database
+        if self.database == "postgres":
+            raise ValueError("Cannot drop the 'postgres'. Read-only database.")
+
+        # Check if database exists using the target database name
+        with self.engine_dev.connect() as conn:
+            result = conn.execute(
+                text(f"SELECT 1 FROM pg_database WHERE datname = '{self.database}';")
+            )
+            if not result.one_or_none():
+                return True
+
+            if force:
+                # Use DROP DATABASE WITH (FORCE) to automatically terminate connections
+                conn.execute(
+                    text(f"DROP DATABASE IF EXISTS {self.database} WITH (FORCE);")
+                )
+            else:
+                # Gentle drop - may fail if there are active connections
+                conn.execute(text(f"DROP DATABASE IF EXISTS {self.database};"))
             conn.commit()
         return True
 
@@ -172,70 +190,29 @@ class Postgres:
 
         Returns:
             list[str]: List of database names
-
-        Raises:
-            sqlalchemy.exc.SQLAlchemyError: If database listing fails due to connection issues,
-                                          permission problems, or query execution errors
-            sqlalchemy.exc.OperationalError: If there are connection or operational issues
-            sqlalchemy.exc.ProgrammingError: If there are SQL syntax or permission errors
-
-        Example:
-            >>> postgres = Postgres()
-            >>> postgres.list_db()
-            ['postgres', 'template0', 'template1', 'my_database']
         """
         with self.engine_dev.connect() as conn:
-            result = conn.execute(text("SELECT datname FROM pg_database WHERE datname NOT LIKE 'template%' ORDER BY datname;"))
+            result = conn.execute(
+                text(
+                    "SELECT datname FROM pg_database WHERE datname NOT LIKE 'template%' ORDER BY datname;"
+                )
+            )
             return [row[0] for row in result.fetchall()]
 
-    def drop_db(self, database: str | None = None, force: bool = False) -> bool:
-        """Drop the specified database if it exists.
+    def list_tables(self) -> list[str]:
+        """List all tables in the current database.
 
-        Uses the development engine connection to execute a DROP DATABASE
-        statement. When force=True, uses FORCE option to terminate all active connections.
-
-        Args:
-            database: Name of the database to drop (default: None, uses self.database)
-            force: Whether to forcefully terminate all active connections (default: False)
+        Returns a list of table names that exist in the current database.
 
         Returns:
-            bool: True if the database was dropped or didn't exist
-
-        Raises:
-            ValueError: If attempting to drop the "postgres" database
-            sqlalchemy.exc.SQLAlchemyError: If database dropping fails due to connection issues,
-                                          permission problems, active connections (when force=False),
-                                          or other database errors
-            sqlalchemy.exc.OperationalError: If there are connection or operational issues
-            sqlalchemy.exc.ProgrammingError: If there are SQL syntax or permission errors
-            sqlalchemy.exc.DatabaseError: If the database is in use and force=False
-
-        Example:
-            >>> postgres = Postgres("my_database")
-            >>> postgres.drop_db()  # Drops self.database
-            True
-            >>> postgres.drop_db("another_db")  # Drops specified database
-            True
-            >>> postgres.drop_db(force=True)  # Forceful drop
-            True
+            list[str]: List of table names in the database
         """
-        target_db = database or self.database
-
-        # Prevent dropping the default postgres database
-        if target_db == "postgres":
-            raise ValueError("Cannot drop the 'postgres'. Read-only database.")
-
-        # Check if database exists using the target database name
-        with self.engine_dev.connect() as conn:
-            result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname = '{target_db}';"))
-            if not result.one_or_none():
-                return True
-
-            if force:
-                # Use DROP DATABASE WITH (FORCE) to automatically terminate connections
-                conn.execute(text(f"DROP DATABASE IF EXISTS {target_db} WITH (FORCE);"))
-            else:
-                # Gentle drop - may fail if there are active connections
-                conn.execute(text(f"DROP DATABASE IF EXISTS {target_db};"))
-            conn.commit()
-        return True
+        if self.database not in self.list_db():
+            raise OperationalError(
+                statement=f"Database '{self.database}' does not exist",
+                params=None,
+                orig=Exception(
+                    f"Database '{self.database}' does not exist in PostgreSQL instance"
+                ),
+            )
+        return inspect(self.engine).get_table_names()
