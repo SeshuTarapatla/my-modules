@@ -40,7 +40,9 @@ def get_logger(
         tracebacks_show_locals=True,
     )
     handler.setLevel(logging.INFO)
-    handler.setFormatter(logging.Formatter("%(message)s"))
+    handler.setFormatter(
+        logging.Formatter("%(message)s", datefmt="[%Y-%m-%d] %H:%M:%S")
+    )
 
     logger.handlers = [handler]
     logger.propagate = propagate
