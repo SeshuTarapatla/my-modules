@@ -8,14 +8,12 @@ __all__: list[str] = [
     "achain",
 ]
 
-import asyncio
 from inspect import isawaitable
 from typing import (
     Any,
     AsyncIterable,
     AsyncIterator,
     Awaitable,
-    Callable,
     TypeVar,
     overload,
 )
@@ -97,12 +95,3 @@ async def achain(*async_iterables: AsyncIterable[Any]) -> AsyncIterator[Any]:
     for iterable in async_iterables:
         async for item in iterable:
             yield item
-
-
-def handle_async(func: Callable):
-    try:
-        loop = asyncio.get_running_loop()
-    except Exception:
-        return asyncio.run(func())
-    else:
-        return loop.create_task(func())
