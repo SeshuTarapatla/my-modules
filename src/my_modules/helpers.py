@@ -3,10 +3,22 @@
 This module provides utility functions for handling async operations.
 """
 
-__all__: list[str] = ["handle_await", "achain", ]
+__all__: list[str] = [
+    "handle_await",
+    "achain",
+]
 
+import asyncio
 from inspect import isawaitable
-from typing import Any, AsyncIterable, AsyncIterator, Awaitable, TypeVar, overload
+from typing import (
+    Any,
+    AsyncIterable,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    TypeVar,
+    overload,
+)
 
 T = TypeVar("T")
 
@@ -87,3 +99,10 @@ async def achain(*async_iterables: AsyncIterable[Any]) -> AsyncIterator[Any]:
             yield item
 
 
+def handle_async(func: Callable):
+    try:
+        loop = asyncio.get_running_loop()
+    except Exception:
+        return asyncio.run(func())
+    else:
+        return loop.create_task(func())
