@@ -1,4 +1,5 @@
-import asyncio
+from socket import create_connection
+from time import sleep
 
 from my_modules.datetime_utils import Timestamp
 from my_modules.logger import get_logger
@@ -15,21 +16,17 @@ class Internet:
         self.timeout = timeout
 
     @property
-    async def is_active(self) -> bool:
+    def is_active(self) -> bool:
         try:
-            _, writer = await asyncio.wait_for(
-                asyncio.open_connection(self.host, self.port), timeout=self.timeout
-            )
-            writer.close()
-            await writer.wait_closed()
-            return True
+            with create_connection((self.host, self.port), timeout=self.timeout):
+                return True
         except Exception:
             return False
 
-    async def wait_for_network(self):
-        if not await self.is_active:
+    def wait_for_network(self):
+        if not self.is_active:
             log.error("Internet disconnected. Pausing till network is back.")
             started_at = Timestamp()
-            while not await self.is_active:
-                await asyncio.sleep(1)
+            while not self.is_active:
+                sleep(1)
             log.info(f"Internet is back. Disconnected for {Timestamp() - started_at}.")
