@@ -382,7 +382,7 @@ class Postgres:
                     for table in reversed(ordered_tables):
                         if table in csv_files:
                             log.info(f"Truncating: [yellow]{table}")
-                            cur.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE;")
+                            cur.execute(f'TRUNCATE TABLE "{table}" RESTART IDENTITY CASCADE;')
 
                     # Restore data in forward order (FK dependencies first)
                     for i, table in enumerate(ordered_tables, start=1):
@@ -392,7 +392,7 @@ class Postgres:
                         log.info(f"Importing table {i}/{total}: [green]{table}")
                         with csv_files[table].open("r", encoding="utf-8") as f:
                             cur.copy_expert(
-                                f"COPY {table} FROM STDIN WITH CSV HEADER;",
+                                f'COPY "{table}" FROM STDIN WITH CSV HEADER;',
                                 f,
                             )
                     conn.commit()
