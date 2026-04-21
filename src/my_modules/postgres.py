@@ -303,7 +303,7 @@ class Postgres:
                         csv_path = tmpdir_path / f"{table}.csv"
                         with csv_path.open("w", encoding="utf-8") as f:
                             cur.copy_expert(
-                                f"COPY {table} TO STDOUT WITH CSV HEADER;",
+                                f'COPY "{table}" TO STDOUT WITH CSV HEADER;',
                                 f,
                             )
                         tar.add(csv_path, arcname=csv_path.name)
