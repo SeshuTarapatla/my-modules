@@ -37,6 +37,14 @@ from my_modules.logger import get_logger
 
 log = get_logger()
 
+# scrcpy's Windows build looks for adb.exe next to scrcpy.exe before falling
+# back to PATH, and its own bundled copy is a different version than the one
+# actually running the ADB server (from PATH / platform-tools) - a version
+# mismatch makes adb kill and restart the server on every scrcpy launch.
+# Pinning --adb to the same binary PATH resolves keeps scrcpy talking to the
+# server that's actually running instead of forcing a churn cycle.
+ADB = which("adb")
+
 
 class Scrcpy:
     """
@@ -131,6 +139,7 @@ class Scrcpy:
         self.proc = Popen(
             [
                 "scrcpy",
+                *([f"--adb={ADB}"] if ADB else []),
                 f"--serial={self.serial}",
                 "--turn-screen-off",
                 "-m1024",
