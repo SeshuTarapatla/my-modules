@@ -28,6 +28,7 @@ Usage:
     scrcpy.start()
 """
 
+import os
 from shutil import which
 from subprocess import DEVNULL, Popen
 
@@ -41,8 +42,13 @@ log = get_logger()
 # back to PATH, and its own bundled copy is a different version than the one
 # actually running the ADB server (from PATH / platform-tools) - a version
 # mismatch makes adb kill and restart the server on every scrcpy launch.
-# Pinning --adb to the same binary PATH resolves keeps scrcpy talking to the
-# server that's actually running instead of forcing a churn cycle.
+# Pointing it at the same binary PATH resolves keeps scrcpy talking to the
+# server that's actually running instead of forcing a churn cycle. scrcpy
+# 3.3.4 has no `--adb=` CLI flag at all (an initial attempt at this fix
+# passed one - it silently failed every launch with "unknown option", swallowed
+# by this class's own stdout/stderr=DEVNULL); the ADB binary is only
+# configurable via the `ADB` environment variable (`scrcpy --help`'s own
+# "Environment variables" section).
 ADB = which("adb")
 
 
@@ -136,10 +142,12 @@ class Scrcpy:
         log.info(
             f"Starting scrcpy session for AdbDevice(serial=[bold green]{self.serial}[/])"
         )
+        env = os.environ.copy()
+        if ADB:
+            env["ADB"] = ADB
         self.proc = Popen(
             [
                 "scrcpy",
-                *([f"--adb={ADB}"] if ADB else []),
                 f"--serial={self.serial}",
                 "--turn-screen-off",
                 "-m1024",
@@ -149,6 +157,7 @@ class Scrcpy:
                 "--window-y=45",
                 "--window-height=1480",
             ],
+            env=env,
             stdout=DEVNULL,
             stderr=DEVNULL,
         )
